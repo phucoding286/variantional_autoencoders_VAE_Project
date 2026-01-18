@@ -2,4 +2,8 @@
 - ❓ Mục đích của mô hình:
   - Nén hình ảnh (hoặc dữ liệu nói chung) thành một vector biễu diễn nén, và nhúng thông tin gốc vào phân phối gaussian.
   - Ứng dụng cho các mô hình hoạt động ở tầng không gian ẩn để tiết kiệm tài nguyên tính toán, ví dụ diffusion (Latent diffusion) hoặc GAN.
-[Google Colab Notebook training thực tế của mô hình này.](https://colab.research.google.com/drive/1QnL5tlzaJWd5QmNcCahFtQ3W7LvBRCCj?authuser=1#scrollTo=684nYgx8Q7Ux)
+- ❗ Cách dùng:
+  - Bạn cần huấn luyện trước mô hình này để nó tái tạo ảnh chính xác trước tiên.
+  - Sau đó bạn dùng latent từ encoder của nó để làm input huấn luyện các mô hình như Diffusion hoặc GAN.
+  - Sau đó dùng decoder của nó để decode lại latent đã đi qua mô hình sinh (Diffusion, GAN) để lấy được ảnh cuối cùng.
+- [Google Colab Notebook training thực tế của mô hình này.](https://colab.research.google.com/drive/1QnL5tlzaJWd5QmNcCahFtQ3W7LvBRCCj?authuser=1#scrollTo=684nYgx8Q7Ux)
