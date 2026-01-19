@@ -2,9 +2,9 @@ from libs import *
 from vae_model import VAE
 
 IMG_SIZE = 256
-batch_size = 16
+batch_size = 32
 lr = 0.0001
-num_epochs = 100
+num_epochs = 2
 
 
 
