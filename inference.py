@@ -74,3 +74,26 @@ show_images(
     unscale_image_one_to_neg_one(x.permute(0, 2, 3, 1).cpu().numpy()),
     timeout=3600
 )
+
+
+"""
+Đây là một thí nghiệm để phá hủy nhẹ latent_z của mô hình để xem nó có tái tạo được từ latent_z bị phá nhẹ hay không.
+Nếu nó tái tạo được, có nghĩa decoder của model khái quát hóa tốt.
+"""
+
+with torch.no_grad():
+    z_latent, _, _ = vae_model.encode_with_scale_n01(x)
+
+    noise = torch.rand_like(z_latent, device=device) - 0.5
+    scale_noise_rate = 1e-1
+    z_latent = (z_latent * (1 - scale_noise_rate)) + (scale_noise_rate * noise)
+
+    z_latent = vae_model.unscale_n01(z_latent)
+    x = vae_model.vae_decoder(z_latent)
+
+    print("X.shape:", x.shape)
+
+    show_images(
+        unscale_image_one_to_neg_one(x.permute(0, 2, 3, 1).cpu().numpy()),
+        timeout=3600
+    )
