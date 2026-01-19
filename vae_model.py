@@ -71,11 +71,13 @@ class VAE(nn.Module):
         super().__init__()
         self.vae_encoder = ConvolutionEncoderVAE(channels_sequence=down_latent_channels_sequence, num_resnet_layers=num_resnet_layers,
                                                  latent_project_channels=latent_project_channels, device=device)
+        self.latent_scaler_n01 = nn.Parameter(torch.tensor(1.0, device=device))
         self.vae_decoder = ConvolutionDecoderVAE(channels_sequence=up_latent_channels_sequence, num_resnet_layers=num_resnet_layers,
                                                  device=device)
         self.latent_project_channels = latent_project_channels
+        self.device = device
 
-    def forward(self, x: torch.Tensor):
+    def encode_with_scale_n01(self, x: torch.Tensor, epsilon=1e-6, in_forward_pass=False):
         with torch.no_grad():
             gaussian_noise_wh_compute = [x.shape[-1], x.shape[-2]]
             for _ in range(len(self.vae_encoder.channels_sequence)-1):
@@ -88,6 +90,21 @@ class VAE(nn.Module):
         )
 
         z_latent, mean, log_var = self.vae_encoder(x, gaussian_noise)
+        if in_forward_pass:
+            z_latent *= (self.latent_scaler_n01.detach() + epsilon)
+        else:
+            z_latent *= (self.latent_scaler_n01 + epsilon)
+        return z_latent, mean, log_var
+
+    def unscale_n01(self, x: torch.Tensor, epsilon=1e-6, in_forward_pass=False):
+        if in_forward_pass:
+            return x / (self.latent_scaler_n01.detach() + epsilon)
+        else:
+            return x / (self.latent_scaler_n01 + epsilon)
+
+    def forward(self, x: torch.Tensor):
+        z_latent, mean, log_var = self.encode_with_scale_n01(x, in_forward_pass=True)
+        z_latent = self.unscale_n01(z_latent, in_forward_pass=True)
         x = self.vae_decoder(z_latent)
         return x, mean, log_var
     

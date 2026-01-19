@@ -63,10 +63,10 @@ show_images(unscale_image_one_to_neg_one(images_loaded.permute(0, 2, 3, 1).cpu()
 
 # test and init model
 model = VAE(
-    down_latent_channels_sequence=[3, 64, 128, 256, 512],
-    up_latent_channels_sequence=[16, 64, 128, 256, 3],
-    num_resnet_layers=3,
-    latent_project_channels=16*2,
+    down_latent_channels_sequence=[3, 64, 128, 256],
+    up_latent_channels_sequence=[8, 64, 128, 3],
+    num_resnet_layers=2,
+    latent_project_channels=8*2,
     device=device
 )
 x = torch.randn(size=(2, 3, IMG_SIZE, IMG_SIZE), device=device)
@@ -87,6 +87,11 @@ optimizer = torch.optim.AdamW(
     lr=lr,
     weight_decay=0.01
 )
+optimizer_for_scaler = torch.optim.SGD(
+    params=[model.latent_scaler_n01],
+    lr=1e-5,
+    weight_decay=0.0
+)
 
 kl_loss_beta = 0.00025
 for epoch in range(num_epochs):
@@ -95,16 +100,31 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         out, mean, log_var = model(x)
         reconstructed_loss = torch.nn.functional.mse_loss(out, x, reduction="sum")
-        kl_loss = -0.5 * torch.sum(1 + log_var - mean.pow(2) - log_var.exp())
+        kl_loss = (-0.5 * torch.sum(1 + log_var - mean.pow(2) - log_var.exp(), dim=(1, 2, 3))).sum()
         loss = reconstructed_loss + (kl_loss * kl_loss_beta)
         loss.backward()
         optimizer.step()
-        print(f"\rEpoch {epoch+1}/{num_epochs} and step {step+1}/{len(train_loader)} with loss {loss.item()}", end="")
+
+        # huấn luyện hệ số scale n01
+        model.vae_encoder.eval()
+        model.vae_encoder.requires_grad_(False)
+        optimizer_for_scaler.zero_grad()
+        z_latent_with_scale_n01, mean, log_var = model.encode_with_scale_n01(x)
+        mean, var = torch.mean(z_latent_with_scale_n01, dim=(1, 2, 3)), torch.var(z_latent_with_scale_n01, dim=(1, 2, 3))
+        mean_loss = torch.nn.functional.l1_loss(mean, torch.zeros(size=mean.shape, device=device), reduction="sum")
+        var_loss = torch.nn.functional.l1_loss(var, torch.ones(size=var.shape, device=device), reduction="sum")
+        scale_loss = mean_loss + var_loss
+        scale_loss.backward()
+        optimizer_for_scaler.step()
+        model.vae_encoder.train()
+        model.vae_encoder.requires_grad_(True)
+
+        print(f"\rEpoch {epoch+1}/{num_epochs} and step {step+1}/{len(train_loader)} with loss {loss.item()}, N(0,1)=[{torch.mean(mean)},{torch.mean(var)}],loss={scale_loss.item()},scale_val={model.latent_scaler_n01.item()}", end="")
 
         if (step+1) % 100 == 0:
             model.eval()
             with torch.no_grad():
                 out = model(x[:1, :, :, :])[0]
             pair = torch.cat([x[:1, :, :, :], out], dim=0)
-            show_images(unscale_image_one_to_neg_one(pair.permute(0, 2, 3, 1).cpu().numpy()), timeout=10)
+            show_images(unscale_image_one_to_neg_one(pair.permute(0, 2, 3, 1).cpu().numpy()), timeout=1)
             model.train()

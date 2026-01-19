@@ -8,4 +8,5 @@ from torch import nn
 import os
 from torchvision.datasets import ImageFolder
 import kagglehub
+import cv2
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
